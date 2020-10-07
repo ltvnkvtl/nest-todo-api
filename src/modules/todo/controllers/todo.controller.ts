@@ -1,40 +1,55 @@
-import {Body, Controller, Delete, Get, Param, Post, Put} from "@nestjs/common";
-import {Todo} from "../entities/todo.entity";
+import {Body, Controller, Delete, Get, NotFoundException, Param, Post, Put} from "@nestjs/common";
 import {CreateDto, UpdateDto} from "./dto";
+import {TodoService} from "../services/todo.service";
+import {Todo} from "../entities/todo.entity";
 
 @Controller('api/todo')
 export class TodoController {
 
+  constructor(private readonly todoService: TodoService) {
+  }
+
   @Get()
-  getAllAction(): string {
-    return 'Todo get all';
+  getAllAction(): Promise<Todo[]> {
+    return this.todoService.findAll();
   }
 
   @Get(':id')
-  getOneAction(@Param('id') id: string): string {
-    return `Todo get one by id=${id}`;
+  async getOneAction(@Param('id') id: string): Promise<Todo> {
+    const todo = await this.todoService.findOne(id);
+
+    if (todo === undefined) {
+      throw new NotFoundException(`Todo with id=${id} not found`)
+    }
+    return todo;
   }
 
-  //Create
   @Post()
-  createAction(@Body() todo: CreateDto): CreateDto {
-    console.log(todo);
-    return todo;
+  createAction(@Body() createDto: CreateDto): Promise<Todo> {
+    const todo = new Todo();
+    todo.title = createDto.title;
+    if (createDto.isCompleted !== undefined) {
+      todo.isCompleted = createDto.isCompleted
+    }
+    return this.todoService.create(todo);
   }
 
-  //Update
   @Put(':id')
-  updateAction(
+  async updateAction(
     @Param('id') id: string,
-    @Body() todo: UpdateDto
-  ): UpdateDto {
-    console.log('Update by ID ', id)
-    console.log(todo, 'saved');
-    return todo;
+    @Body() { title, isCompleted = false }: UpdateDto
+  ): Promise<Todo> {
+    const todo = await this.todoService.findOne(id);
+    if (todo === undefined) {
+      throw new NotFoundException('Invalid todo');
+    }
+    todo.title = title;
+    todo.isCompleted = isCompleted;
+    return this.todoService.update(todo);
   }
 
   @Delete(':id')
-  deleteAction(@Param('id') id: string): string {
-    return `Delete by id=${id}`;
+  deleteAction(@Param('id') id: string): Promise<void> {
+    return this.todoService.remove(id);;
   }
 }
